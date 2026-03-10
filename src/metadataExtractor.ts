@@ -1,25 +1,103 @@
-import { TFile } from "obsidian";
-import { ExtractionResult } from "types";
-import { withFallbackMetadata } from "utils/fallbacks";
+import { App, TFile } from "obsidian";
+import { BookMetadata, ExtractionResult, MediaNoteSettings, ZoteroCache } from "types";
+import { ZoteroClient } from "zotero/zoteroClient";
+import { ZoteroItem } from "zotero/zoteroTypes";
+import { openZoteroPickerModal } from "ui/ZoteroPickerModal";
+import { filenameToSearchQuery, withFallbackMetadata } from "utils/fallbacks";
 
-// ---------------------------------------------------------------------------
-// Zotero integration (not yet implemented)
-//
-// When ready, implement fetchZoteroMetadata() to look up metadata via the
-// Zotero API (https://www.zotero.org/support/dev/web_api/v3/basics) and
-// return a Partial<BookMetadata>. Plug it in below before the filename
-// fallback, e.g.:
-//
-//   const zoteroResult = await fetchZoteroMetadata(file);
-//   if (zoteroResult) {
-//     return { metadata: withFallbackMetadata(zoteroResult, file.path), warnings };
-//   }
-// ---------------------------------------------------------------------------
+function sanitizeZoteroTag(tag: string): string | null {
+	const sanitized = tag
+		.trim()
+		.toLowerCase()
+		.replace(/[\s_]+/g, "-")        // spaces/underscores → hyphens
+		.replace(/[^a-z-]/g, "");       // strip everything except letters and hyphens
+	if (!sanitized || /^-|-$/.test(sanitized)) return null; // drop empty or leading/trailing hyphens
+	return sanitized;
+}
 
-export async function extractMetadataFromFile(file: TFile, _binary: ArrayBuffer): Promise<ExtractionResult> {
-	// Derive all metadata from the filename until a richer source (e.g. Zotero) is wired in.
+function mapZoteroItem(item: ZoteroItem): Partial<BookMetadata> {
+	const data = item.data;
+
+	const firstAuthor = data.creators?.find((c) => c.creatorType === "author");
+	let author: string | null = null;
+	if (firstAuthor) {
+		if (firstAuthor.firstName && firstAuthor.lastName) {
+			author = `${firstAuthor.firstName} ${firstAuthor.lastName}`;
+		} else {
+			author = firstAuthor.lastName ?? firstAuthor.name ?? null;
+		}
+	}
+
 	return {
-		metadata: withFallbackMetadata({}, file.path),
-		warnings: [],
+		title: data.title ?? null,
+		author,
+		year: data.date ?? null,
+		publisher: data.publisher ?? null,
+		language: data.language ?? null,
+		isbn: data.ISBN ?? null,
+		dateAdded: data.dateAdded ? data.dateAdded.slice(0, 10) : null,
+		tags: data.tags
+			?.map((t) => sanitizeZoteroTag(t.tag))
+			.filter((t): t is string => t !== null) ?? [],
 	};
+}
+
+export async function extractMetadataFromFile(
+	file: TFile,
+	_binary: ArrayBuffer,
+	app: App,
+	settings: MediaNoteSettings,
+	zoteroCache: ZoteroCache,
+	isBatch: boolean,
+): Promise<ExtractionResult> {
+	const warnings: string[] = [];
+
+	// Cache hit — skip network lookup
+	const cached = zoteroCache[file.path];
+	if (cached) {
+		return { metadata: withFallbackMetadata(cached.metadata, file.path), warnings };
+	}
+
+	// Zotero not configured — fall back to filename
+	if (!settings.zoteroUserId) {
+		return { metadata: withFallbackMetadata({}, file.path), warnings };
+	}
+
+	const apiKey = (app.loadLocalStorage("zoteroApiKey") as string | null) ?? "";
+	const client = new ZoteroClient(settings.zoteroUserId, apiKey);
+	const searchTitle = filenameToSearchQuery(file.path);
+
+	let items: ZoteroItem[] = [];
+	try {
+		items = await client.searchByTitle(searchTitle);
+	} catch (err) {
+		const msg = err instanceof Error ? err.message : String(err);
+		console.warn(`[Zotero] Lookup error for "${file.path}": ${msg}`);
+		warnings.push(`Zotero lookup failed: ${msg}`);
+		return { metadata: withFallbackMetadata({}, file.path), warnings };
+	}
+
+	if (items.length === 0) {
+		console.warn(`[Zotero] No matches found for "${searchTitle}" — falling back to filename`);
+		warnings.push(`No Zotero match found for "${searchTitle}". Using filename.`);
+		return { metadata: withFallbackMetadata({}, file.path), warnings };
+	}
+
+	let chosen: ZoteroItem;
+	if (items.length === 1) {
+		chosen = items[0]!;
+	} else if (isBatch) {
+		chosen = items[0]!;
+	} else {
+		const picked = await openZoteroPickerModal(app, items);
+		if (!picked) {
+			return { metadata: withFallbackMetadata({}, file.path), warnings };
+		}
+		chosen = picked;
+	}
+
+	const partial = mapZoteroItem(chosen);
+	zoteroCache[file.path] = { itemKey: chosen.key, fetchedAt: Date.now(), metadata: partial };
+
+	return { metadata: withFallbackMetadata(partial, file.path), warnings };
 }

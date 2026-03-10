@@ -1,90 +1,93 @@
-# Obsidian Sample Plugin
+# Library Note Generator
 
-This is a sample plugin for Obsidian (https://obsidian.md).
+An Obsidian plugin that automatically creates companion Markdown notes for library files (books, PDFs, EPUBs, etc.) stored in your vault, optionally populated with metadata fetched from your Zotero library.
 
-This project uses TypeScript to provide type checking and documentation.
-The repo depends on the latest plugin API (obsidian.d.ts) in TypeScript Definition format, which contains TSDoc comments describing what it does.
+## Features
 
-This sample plugin demonstrates some of the basic functionality the plugin API can do.
-- Adds a ribbon icon, which shows a Notice when clicked.
-- Adds a command "Open modal (simple)" which opens a Modal.
-- Adds a plugin setting tab to the settings page.
-- Registers a global click event and output 'click' to the console.
-- Registers a global interval which logs 'setInterval' to the console.
+- **Auto-create on add** — when a library file is added to a watched folder, a companion note is created immediately.
+- **Zotero metadata** — titles, authors, tags, and other fields are pulled from Zotero and written as file properties (frontmatter).
+- **Smart re-generation** — re-running note generation refreshes only the Zotero-managed frontmatter fields; any body text or custom frontmatter keys you have added are preserved.
+- **Local-first Zotero** — queries the local Zotero desktop app (no rate limits) and falls back to the Zotero web API automatically.
+- **Filename fallback** — if no Zotero match is found, the book file name is used as the note title.
 
-## First time developing plugins?
+## Requirements
 
-Quick starting guide for new plugin devs:
+- Obsidian 1.8.7 or later (desktop only)
+- [Zotero](https://www.zotero.org/) desktop app, or a Zotero web API key
 
-- Check if [someone already developed a plugin for what you want](https://obsidian.md/plugins)! There might be an existing plugin similar enough that you can partner up with.
-- Make a copy of this repo as a template with the "Use this template" button (login to GitHub if you don't see it).
-- Clone your repo to a local development folder. For convenience, you can place this folder in your `.obsidian/plugins/your-plugin-name` folder.
-- Install NodeJS, then run `npm i` in the command line under your repo folder.
-- Run `npm run dev` to compile your plugin from `main.ts` to `main.js`.
-- Make changes to `main.ts` (or create new `.ts` files). Those changes should be automatically compiled into `main.js`.
-- Reload Obsidian to load the new version of your plugin.
-- Enable plugin in settings window.
-- For updates to the Obsidian API run `npm update` in the command line under your repo folder.
+## Installation
 
-## Releasing new releases
+### From the community plugin list
 
-- Update your `manifest.json` with your new version number, such as `1.0.1`, and the minimum Obsidian version required for your latest release.
-- Update your `versions.json` file with `"new-plugin-version": "minimum-obsidian-version"` so older versions of Obsidian can download an older version of your plugin that's compatible.
-- Create new GitHub release using your new version number as the "Tag version". Use the exact version number, don't include a prefix `v`. See here for an example: https://github.com/obsidianmd/obsidian-sample-plugin/releases
-- Upload the files `manifest.json`, `main.js`, `styles.css` as binary attachments. Note: The manifest.json file must be in two places, first the root path of your repository and also in the release.
-- Publish the release.
+1. Open **Settings → Community plugins** and disable Safe mode if prompted.
+2. Select **Browse**, search for **Library Note Generator**, and install it.
+3. Enable the plugin.
 
-> You can simplify the version bump process by running `npm version patch`, `npm version minor` or `npm version major` after updating `minAppVersion` manually in `manifest.json`.
-> The command will bump version in `manifest.json` and `package.json`, and add the entry for the new version to `versions.json`
+### Manual installation
 
-## Adding your plugin to the community plugin list
+Copy `main.js`, `manifest.json`, and `styles.css` to:
 
-- Check the [plugin guidelines](https://docs.obsidian.md/Plugins/Releasing/Plugin+guidelines).
-- Publish an initial version.
-- Make sure you have a `README.md` file in the root of your repo.
-- Make a pull request at https://github.com/obsidianmd/obsidian-releases to add your plugin.
-
-## How to use
-
-- Clone this repo.
-- Make sure your NodeJS is at least v16 (`node --version`).
-- `npm i` or `yarn` to install dependencies.
-- `npm run dev` to start compilation in watch mode.
-
-## Manually installing the plugin
-
-- Copy over `main.js`, `styles.css`, `manifest.json` to your vault `VaultFolder/.obsidian/plugins/your-plugin-id/`.
-
-## Improve code quality with eslint
-- [ESLint](https://eslint.org/) is a tool that analyzes your code to quickly find problems. You can run ESLint against your plugin to find common bugs and ways to improve your code. 
-- This project already has eslint preconfigured, you can invoke a check by running`npm run lint`
-- Together with a custom eslint [plugin](https://github.com/obsidianmd/eslint-plugin) for Obsidan specific code guidelines.
-- A GitHub action is preconfigured to automatically lint every commit on all branches.
-
-## Funding URL
-
-You can include funding URLs where people who use your plugin can financially support it.
-
-The simple way is to set the `fundingUrl` field to your link in your `manifest.json` file:
-
-```json
-{
-    "fundingUrl": "https://buymeacoffee.com"
-}
+```
+<Vault>/.obsidian/plugins/reading-note-generator/
 ```
 
-If you have multiple URLs, you can also do:
+Then enable the plugin in **Settings → Community plugins**.
 
-```json
-{
-    "fundingUrl": {
-        "Buy Me a Coffee": "https://buymeacoffee.com",
-        "GitHub Sponsor": "https://github.com/sponsors",
-        "Patreon": "https://www.patreon.com/"
-    }
-}
+## Setup
+
+### 1. Add watched folders
+
+In **Settings → Library Note Generator → Watched folders**, add the vault folders that contain your library files. Only files inside these folders will have notes generated.
+
+### 2. Configure Zotero
+
+**Option A — Local Zotero (recommended)**
+
+Enable the local API in Zotero: **Edit → Settings → Advanced → Allow other applications on this computer to communicate with Zotero**. No API key is needed.
+
+Enter your numeric Zotero **User ID** (found at [zotero.org/settings/keys](https://www.zotero.org/settings/keys)) in **Settings → Library Note Generator → Zotero → User ID**.
+
+**Option B — Zotero web API**
+
+Enter your **User ID** and a read-only **API key** (created at [zotero.org/settings/keys](https://www.zotero.org/settings/keys)) in the settings. The API key is stored in vault-scoped localStorage and is never written to `data.json` or synced.
+
+### 3. Choose a companion note location
+
+- **Subfolder mode** (default) — notes are created in a subfolder inside each watched folder (e.g. `Books/Notes/`).
+- **Global folder mode** — all notes are created in one vault-wide folder.
+
+Set the subfolder or folder name under **Settings → Library Note Generator → Companion note settings**.
+
+## Usage
+
+### Commands
+
+| Command                                  | Description                                                                                                                         |
+| ---------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| **Generate note for current file**       | Creates or updates the companion note for the active library file. If Zotero returns multiple matches, a picker modal appears.      |
+| **Generate notes for all library files** | Batch-processes every library file in all watched folders. Multiple Zotero matches are resolved by auto-selecting the first result. |
+
+### Generated frontmatter
+
+```yaml
+---
+title: "The Art of Doing Science and Engineering"
+author: "Richard Hamming"
+year: "1997"
+publisher: "Gordon and Breach"
+language: "en"
+isbn: "9789056995256"
+date_added: "2023-04-12"
+file: "[[Books/Hamming - The Art of Doing Science and Engineering.pdf]]"
+tags: ["engineering", "science", "career"]
+---
 ```
 
-## API Documentation
+### Re-generating notes
 
-See https://docs.obsidian.md
+Running either command on a file that already has a companion note updates only the Zotero-managed fields listed above. Your own frontmatter keys and all body content below the closing `---` are left untouched.
+
+## License
+
+[BSD Zero Clause License](LICENSE)
+

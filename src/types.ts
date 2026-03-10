@@ -5,7 +5,8 @@ export interface MediaNoteSettings {
 	outputMode: OutputMode;
 	outputFolderName: string;
 	autoCreateOnAdd: boolean;
-	overwriteExisting: boolean;
+	zoteroUserId: string;
+	// zoteroApiKey is stored in vault-scoped localStorage, not here
 }
 
 export interface BookMetadata {
@@ -14,7 +15,23 @@ export interface BookMetadata {
 	year: string | null;
 	publisher: string | null;
 	language: string | null;
+	isbn: string | null;
+	dateAdded: string | null;
+	tags: string[];
 	sourceFile: string;
+}
+
+export interface ZoteroCacheEntry {
+	itemKey: string;
+	fetchedAt: number; // Unix ms
+	metadata: Partial<BookMetadata>;
+}
+
+export type ZoteroCache = Record<string, ZoteroCacheEntry>;
+
+export interface PluginData {
+	settings: MediaNoteSettings;
+	zoteroCache: ZoteroCache;
 }
 
 export interface ExtractionResult {
@@ -25,6 +42,5 @@ export interface ExtractionResult {
 export interface NoteWriteResult {
 	notePath: string;
 	updated: boolean;
-	skipped: boolean;
 	warnings: string[];
 }

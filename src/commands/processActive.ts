@@ -1,9 +1,14 @@
 import { App, Notice, TFile } from "obsidian";
 import { createOrUpdateCompanionNote } from "noteWriter";
-import { MediaNoteSettings, NoteWriteResult } from "types";
+import { MediaNoteSettings, NoteWriteResult, ZoteroCache } from "types";
 import { isInWatchedFolders, isSupportedMediaFile } from "utils/paths";
 
-export async function processActiveFile(app: App, settings: MediaNoteSettings): Promise<void> {
+export async function processActiveFile(
+	app: App,
+	settings: MediaNoteSettings,
+	zoteroCache: ZoteroCache,
+	saveCache: () => Promise<void>,
+): Promise<void> {
 	const activeFile = app.workspace.getActiveFile();
 	if (!activeFile) {
 		new Notice("No active file selected.");
@@ -11,7 +16,7 @@ export async function processActiveFile(app: App, settings: MediaNoteSettings): 
 	}
 
 	if (!isSupportedMediaFile(activeFile)) {
-		new Notice("Active file is not a PDF or EPUB.");
+		new Notice("Active file is not a supported library file (PDF or EPUB).");
 		return;
 	}
 
@@ -20,14 +25,23 @@ export async function processActiveFile(app: App, settings: MediaNoteSettings): 
 		return;
 	}
 
-	await processOneFile(activeFile, app, settings, true);
+	await processOneFile(activeFile, app, settings, zoteroCache, false, saveCache, true);
 }
 
-export async function processOneFile(file: TFile, app: App, settings: MediaNoteSettings, showSuccessNotice = false): Promise<NoteWriteResult | null> {
+export async function processOneFile(
+	file: TFile,
+	app: App,
+	settings: MediaNoteSettings,
+	zoteroCache: ZoteroCache,
+	isBatch: boolean,
+	saveCache: () => Promise<void>,
+	showSuccessNotice = false,
+): Promise<NoteWriteResult | null> {
 	try {
-		const result = await createOrUpdateCompanionNote(file, app, settings);
+		const result = await createOrUpdateCompanionNote(file, app, settings, zoteroCache, isBatch);
+		await saveCache();
 		if (showSuccessNotice) {
-			const action = result.skipped ? "Note already up to date" : result.updated ? "Updated note" : "Created note";
+			const action = result.updated ? "Updated note" : "Created note";
 			new Notice(`${action}: ${result.notePath}`);
 		}
 		const firstWarning = result.warnings[0];

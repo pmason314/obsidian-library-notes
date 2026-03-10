@@ -1,7 +1,13 @@
 import { App, TFile } from "obsidian";
 import { extractMetadataFromFile } from "metadataExtractor";
-import { MediaNoteSettings, NoteWriteResult, BookMetadata } from "types";
+import { MediaNoteSettings, NoteWriteResult, BookMetadata, ZoteroCache } from "types";
 import { normalizeVaultPath } from "utils/paths";
+
+// Keys written by Zotero extraction — these are always refreshed on re-generation.
+// Any frontmatter key NOT in this set is treated as user-managed and is preserved.
+const ZOTERO_FRONTMATTER_KEYS = new Set([
+	"title", "author", "year", "publisher", "language", "isbn", "date_added", "tags", "file",
+]);
 
 function sanitizeFilename(value: string): string {
 	return value.replace(/[/\\:*?"<>|]/g, "").trim() || "Untitled";
@@ -19,17 +25,59 @@ export function generateFrontmatter(metadata: BookMetadata): string {
 	if (metadata.year) lines.push(`year: ${quoteYaml(metadata.year)}`);
 	if (metadata.publisher) lines.push(`publisher: ${quoteYaml(metadata.publisher)}`);
 	if (metadata.language) lines.push(`language: ${quoteYaml(metadata.language)}`);
+	if (metadata.isbn) lines.push(`isbn: ${quoteYaml(metadata.isbn)}`);
+	if (metadata.dateAdded) lines.push(`date_added: ${quoteYaml(metadata.dateAdded)}`);
 	lines.push(`file: ${quoteYaml(`[[${metadata.sourceFile}]]`)}`);
-	lines.push("tags: []");
+	const tagList = metadata.tags.length > 0
+		? `[${metadata.tags.map(quoteYaml).join(", ")}]`
+		: "[]";
+	lines.push(`tags: ${tagList}`);
 	lines.push("---", "");
 
 	return `${lines.join("\n")}\n`;
 }
 
+/**
+ * Merges fresh Zotero frontmatter into an existing note.
+ * - Zotero-managed keys (ZOTERO_FRONTMATTER_KEYS) are replaced with values from newFrontmatter.
+ * - User-added frontmatter keys are preserved in place.
+ * - The note body (everything after the closing ---) is always preserved.
+ * - If the existing content has no frontmatter block, the new frontmatter is prepended.
+ */
+export function mergeNoteContent(existingContent: string, newFrontmatter: string): string {
+	const fmMatch = existingContent.match(/^---\n([\s\S]*?\n)---(\n|$)/);
+	if (!fmMatch) {
+		// No existing frontmatter — prepend and keep all existing content as body
+		return newFrontmatter + existingContent;
+	}
+
+	const body = existingContent.slice(fmMatch[0].length);
+	const existingFmLines = (fmMatch[1] ?? "").split("\n");
+
+	// Collect user-defined lines (keys not managed by Zotero)
+	const userLines: string[] = [];
+	for (const line of existingFmLines) {
+		const keyMatch = line.match(/^([a-zA-Z0-9_-]+)\s*:/);
+		if (keyMatch?.[1] && !ZOTERO_FRONTMATTER_KEYS.has(keyMatch[1])) {
+			userLines.push(line);
+		}
+	}
+
+	if (userLines.length === 0) {
+		return newFrontmatter + body;
+	}
+
+	// Inject user lines before the closing --- of the new frontmatter
+	const closingIndex = newFrontmatter.lastIndexOf("\n---\n");
+	const beforeClose = newFrontmatter.slice(0, closingIndex);
+	const afterClose = newFrontmatter.slice(closingIndex); // "\n---\n"
+	return beforeClose + "\n" + userLines.join("\n") + afterClose + body;
+}
+
 export function generateNotePath(metadata: BookMetadata, settings: MediaNoteSettings): string {
 	const title = metadata.title ?? "Untitled";
 	const noteName = `${sanitizeFilename(title)}.md`;
-	const folderName = normalizeVaultPath(settings.outputFolderName) || "Sources";
+	const folderName = normalizeVaultPath(settings.outputFolderName) || "Notes";
 
 	if (settings.outputMode === "subfolder") {
 		const matchingFolder = settings.watchedFolders
@@ -69,14 +117,13 @@ function splitNotePath(notePath: string): { folder: string; stem: string; extens
 	return { folder, stem, extension };
 }
 
-async function resolveWritePath(app: App, preferredPath: string, overwriteExisting: boolean): Promise<{ path: string; existing: TFile | null }> {
-	const preferredFile = app.vault.getAbstractFileByPath(preferredPath);
-	if (!preferredFile) {
-		return { path: preferredPath, existing: null };
-	}
-
-	if (preferredFile instanceof TFile && overwriteExisting) {
-		return { path: preferredPath, existing: preferredFile };
+/**
+ * Returns a free path for a new note, incrementing a numeric suffix to avoid
+ * collisions with notes that belong to different source files.
+ */
+async function findFreeNotePath(app: App, preferredPath: string): Promise<string> {
+	if (!app.vault.getAbstractFileByPath(preferredPath)) {
+		return preferredPath;
 	}
 
 	const { folder, stem, extension } = splitNotePath(preferredPath);
@@ -84,43 +131,41 @@ async function resolveWritePath(app: App, preferredPath: string, overwriteExisti
 	while (true) {
 		const candidateName = `${stem}-${suffix}${extension}`;
 		const candidatePath = folder ? `${folder}/${candidateName}` : candidateName;
-		const existingCandidate = app.vault.getAbstractFileByPath(candidatePath);
-		if (!existingCandidate) {
-			return { path: candidatePath, existing: null };
+		if (!app.vault.getAbstractFileByPath(candidatePath)) {
+			return candidatePath;
 		}
 		suffix += 1;
 	}
 }
 
-export async function createOrUpdateCompanionNote(file: TFile, app: App, settings: MediaNoteSettings): Promise<NoteWriteResult> {
+export async function createOrUpdateCompanionNote(
+	file: TFile,
+	app: App,
+	settings: MediaNoteSettings,
+	zoteroCache: ZoteroCache,
+	isBatch: boolean,
+): Promise<NoteWriteResult> {
 	const binary = await app.vault.readBinary(file);
-	const extraction = await extractMetadataFromFile(file, binary);
+	const extraction = await extractMetadataFromFile(file, binary, app, settings, zoteroCache, isBatch);
 
 	const preferredNotePath = generateNotePath(extraction.metadata, settings);
 	const outputFolder = normalizeVaultPath(preferredNotePath.slice(0, preferredNotePath.lastIndexOf("/")));
 	await ensureFolderExists(app, outputFolder);
 
-	const content = generateFrontmatter(extraction.metadata);
+	const newFrontmatter = generateFrontmatter(extraction.metadata);
 
-	// Idempotency check: if the preferred note already exists and was written for this
-	// same source file, skip rather than creating a -2 duplicate.
-	if (!settings.overwriteExisting) {
-		const existingFile = app.vault.getAbstractFileByPath(preferredNotePath);
-		if (existingFile instanceof TFile) {
-			const existingContent = await app.vault.read(existingFile);
-			if (existingContent.includes(`[[${file.path}]]`)) {
-				return { notePath: preferredNotePath, updated: false, skipped: true, warnings: extraction.warnings };
-			}
+	const existingFile = app.vault.getAbstractFileByPath(preferredNotePath);
+	if (existingFile instanceof TFile) {
+		const existingContent = await app.vault.read(existingFile);
+		if (existingContent.includes(`[[${file.path}]]`)) {
+			// This note belongs to the same source file — merge Zotero fields, preserve user content.
+			await app.vault.modify(existingFile, mergeNoteContent(existingContent, newFrontmatter));
+			return { notePath: preferredNotePath, updated: true, warnings: extraction.warnings };
 		}
 	}
 
-	const writeTarget = await resolveWritePath(app, preferredNotePath, settings.overwriteExisting);
-
-	if (writeTarget.existing) {
-		await app.vault.modify(writeTarget.existing, content);
-		return { notePath: writeTarget.path, updated: true, skipped: false, warnings: extraction.warnings };
-	}
-
-	await app.vault.create(writeTarget.path, content);
-	return { notePath: writeTarget.path, updated: false, skipped: false, warnings: extraction.warnings };
+	// Preferred path is free or belongs to a different source — find a free path and create.
+	const writePath = existingFile ? await findFreeNotePath(app, preferredNotePath) : preferredNotePath;
+	await app.vault.create(writePath, newFrontmatter);
+	return { notePath: writePath, updated: false, warnings: extraction.warnings };
 }

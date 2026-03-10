@@ -1,4 +1,4 @@
-import { AbstractInputSuggest, App, PluginSettingTab, Setting } from "obsidian";
+import { AbstractInputSuggest, App, Notice, PluginSettingTab, Setting } from "obsidian";
 import MediaNotePlugin from "main";
 import { MediaNoteSettings, OutputMode } from "types";
 import { normalizeVaultPath } from "utils/paths";
@@ -6,9 +6,9 @@ import { normalizeVaultPath } from "utils/paths";
 export const DEFAULT_SETTINGS: MediaNoteSettings = {
 	watchedFolders: [],
 	outputMode: "subfolder",
-	outputFolderName: "Sources",
+	outputFolderName: "Notes",
 	autoCreateOnAdd: true,
-	overwriteExisting: false,
+	zoteroUserId: "",
 };
 
 class FolderSuggest extends AbstractInputSuggest<string> {
@@ -59,7 +59,7 @@ export class MediaNoteSettingTab extends PluginSettingTab {
 
 	private async updateSettings(mutator: (settings: MediaNoteSettings) => void): Promise<void> {
 		mutator(this.plugin.settings);
-		this.plugin.settings.outputFolderName = normalizeVaultPath(this.plugin.settings.outputFolderName) || "Sources";
+		this.plugin.settings.outputFolderName = normalizeVaultPath(this.plugin.settings.outputFolderName) || "Notes";
 		await this.plugin.saveSettings();
 	}
 
@@ -69,7 +69,7 @@ export class MediaNoteSettingTab extends PluginSettingTab {
 		new Setting(section)
 			.setName("Watched folders")
 			.setHeading()
-			.setDesc("Only media files in these folders will have companion notes created. Use the 'Generate notes for all media files' command after changing this list to update existing notes.")
+			.setDesc("Only library files (PDFs, EPUBs, and other non-Markdown) in these folders will have companion notes created. Use the 'Generate notes for all library files' command to create or update companion notes.")
 			.addButton((button) => button
 				.setButtonText("Add folder")
 				.onClick(async () => {
@@ -110,7 +110,7 @@ export class MediaNoteSettingTab extends PluginSettingTab {
 		const { containerEl } = this;
 		containerEl.empty();
 
-		const title = containerEl.createEl("h2", { text: "Media Note Generator settings" });
+		const title = containerEl.createEl("h2", { text: "Library Note Generator settings" });
 		title.style.marginBottom = "1.5em";
 
 		this.renderWatchedFolders(containerEl);
@@ -139,10 +139,10 @@ export class MediaNoteSettingTab extends PluginSettingTab {
 		new Setting(containerEl)
 			.setName(isSubfolder ? "Subfolder name" : "Global companion note folder")
 			.setDesc(isSubfolder
-				? "Created inside each watched folder (e.g. Books/Book Notes)"
+				? "Created inside each watched folder (e.g. Books/Notes)"
 				: "Path where all auto-created companion notes are saved")
 			.addText((text) => {
-				text.setPlaceholder("Book Notes").setValue(this.plugin.settings.outputFolderName);
+				text.setPlaceholder("Notes").setValue(this.plugin.settings.outputFolderName);
 				text.inputEl.style.width = "100%";
 
 				if (!isSubfolder) {
@@ -158,6 +158,50 @@ export class MediaNoteSettingTab extends PluginSettingTab {
 				});
 			});
 
+		// Zotero
+		const zoteroHeading = new Setting(containerEl)
+			.setName("Zotero")
+			.setHeading();
+		zoteroHeading.settingEl.style.marginTop = "2em";
+
+		new Setting(containerEl)
+			.setName("User ID")
+			.setDesc(createFragment((frag) => {
+				frag.appendText("Your numeric Zotero user ID. Find it at ");
+				frag.createEl("a", { text: "zotero.org/settings/keys", href: "https://www.zotero.org/settings/keys" });
+				frag.appendText(".");
+			}))
+			.addText((text) => text
+				.setPlaceholder("123456")
+				.setValue(this.plugin.settings.zoteroUserId)
+				.onChange(async (value) => {
+					this.plugin.settings.zoteroUserId = value.trim();
+					await this.plugin.saveSettings();
+				}));
+
+		new Setting(containerEl)
+			.setName("API key")
+			.setDesc("Read-only API key from zotero.org/settings/keys. Stored in vault-scoped localStorage (not synced, not in data.json).")
+			.addText((text) => {
+				text.setPlaceholder("••••••••••••••••••••••••")
+					.setValue((this.app.loadLocalStorage("zoteroApiKey") as string | null) ?? "")
+					.onChange((value) => {
+						this.app.saveLocalStorage("zoteroApiKey", value.trim() || null);
+					});
+				text.inputEl.type = "password";
+			});
+
+		new Setting(containerEl)
+			.setName("Clear Zotero cache")
+			.setDesc("Forces all files to be re-looked up on the next note generation run.")
+			.addButton((button) => button
+				.setButtonText("Clear cache")
+				.onClick(async () => {
+					this.plugin.zoteroCache = {};
+					await this.plugin.saveSettings();
+					new Notice("Zotero cache cleared.");
+				}));
+
 		// General
 		const generalHeading = new Setting(containerEl)
 			.setName("General")
@@ -166,7 +210,7 @@ export class MediaNoteSettingTab extends PluginSettingTab {
 
 		new Setting(containerEl)
 			.setName("Auto-create on add")
-			.setDesc("Automatically create a companion note when a new non-Markdown file (e.g. PDF or EPUB) appears")
+			.setDesc("Automatically create a companion note when a new library file (PDF, EPUB, etc.) is added to a watched folder")
 			.addToggle((toggle) => toggle
 				.setValue(this.plugin.settings.autoCreateOnAdd)
 				.onChange(async (value) => {
@@ -175,15 +219,5 @@ export class MediaNoteSettingTab extends PluginSettingTab {
 					});
 				}));
 
-		new Setting(containerEl)
-			.setName("Overwrite existing")
-			.setDesc("Modify an existing companion note if it already exists.  Rerunning note generation commands will always update auto-created notes.")
-			.addToggle((toggle) => toggle
-				.setValue(this.plugin.settings.overwriteExisting)
-				.onChange(async (value) => {
-					await this.updateSettings((settings) => {
-						settings.overwriteExisting = value;
-					});
-				}));
 	}
 }
