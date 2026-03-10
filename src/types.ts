@@ -6,7 +6,7 @@ export interface MediaNoteSettings {
 	outputFolderName: string;
 	autoCreateOnAdd: boolean;
 	zoteroUserId: string;
-	// zoteroApiKey is stored in vault-scoped localStorage, not here
+	zoteroApiKeyName: string; // name of the SecretStorage entry holding the API key
 }
 
 export interface BookMetadata {

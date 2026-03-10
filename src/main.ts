@@ -54,12 +54,6 @@ export default class MediaNotePlugin extends Plugin {
 		const loaded = await this.loadData() as Partial<PluginData> | null;
 		const rawSettings = (loaded?.settings ?? loaded) as Record<string, unknown> | null;
 
-		// Migrate legacy API key from data.json → vault-scoped localStorage (one-time)
-		const legacyKey = rawSettings?.zoteroApiKey;
-		if (typeof legacyKey === "string" && legacyKey) {
-			this.app.saveLocalStorage("zoteroApiKey", legacyKey);
-		}
-
 		this.settings = { ...DEFAULT_SETTINGS, ...(rawSettings as Partial<MediaNoteSettings>) };
 		this.zoteroCache = loaded?.zoteroCache ?? {};
 	}

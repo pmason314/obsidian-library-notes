@@ -63,7 +63,7 @@ export async function extractMetadataFromFile(
 		return { metadata: withFallbackMetadata({}, file.path), warnings };
 	}
 
-	const apiKey = (app.loadLocalStorage("zoteroApiKey") as string | null) ?? "";
+	const apiKey = app.secretStorage.getSecret(settings.zoteroApiKeyName) ?? "";
 	const client = new ZoteroClient(settings.zoteroUserId, apiKey);
 	const searchTitle = filenameToSearchQuery(file.path);
 

@@ -1,4 +1,4 @@
-import { AbstractInputSuggest, App, Notice, PluginSettingTab, Setting } from "obsidian";
+import { AbstractInputSuggest, App, Notice, PluginSettingTab, SecretComponent, Setting } from "obsidian";
 import MediaNotePlugin from "main";
 import { MediaNoteSettings, OutputMode } from "types";
 import { normalizeVaultPath } from "utils/paths";
@@ -9,6 +9,7 @@ export const DEFAULT_SETTINGS: MediaNoteSettings = {
 	outputFolderName: "Notes",
 	autoCreateOnAdd: true,
 	zoteroUserId: "",
+	zoteroApiKeyName: "",
 };
 
 class FolderSuggest extends AbstractInputSuggest<string> {
@@ -181,15 +182,17 @@ export class MediaNoteSettingTab extends PluginSettingTab {
 
 		new Setting(containerEl)
 			.setName("API key")
-			.setDesc("Read-only API key from zotero.org/settings/keys. Stored in vault-scoped localStorage (not synced, not in data.json).")
-			.addText((text) => {
-				text.setPlaceholder("••••••••••••••••••••••••")
-					.setValue((this.app.loadLocalStorage("zoteroApiKey") as string | null) ?? "")
-					.onChange((value) => {
-						this.app.saveLocalStorage("zoteroApiKey", value.trim() || null);
-					});
-				text.inputEl.type = "password";
-			});
+			.setDesc(createFragment((frag) => {
+				frag.appendText("Read-only API key from ");
+				frag.createEl("a", { text: "zotero.org/settings/keys", href: "https://www.zotero.org/settings/keys" });
+				frag.appendText(". Select an existing secret or create a new one with default permissions.");
+			}))
+			.addComponent((el) => new SecretComponent(this.app, el)
+				.setValue(this.plugin.settings.zoteroApiKeyName)
+				.onChange(async (value) => {
+					this.plugin.settings.zoteroApiKeyName = value;
+					await this.plugin.saveSettings();
+				}));
 
 		new Setting(containerEl)
 			.setName("Clear Zotero cache")
