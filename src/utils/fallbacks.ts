@@ -51,6 +51,7 @@ export function withFallbackMetadata(metadata: Partial<BookMetadata>, sourceFile
 		author: sanitizeMetadataValue(metadata.author),
 		year: extractYear(metadata.year),
 		publisher: sanitizeMetadataValue(metadata.publisher),
+		edition: sanitizeMetadataValue(metadata.edition),
 		language: sanitizeMetadataValue(metadata.language),
 		isbn: sanitizeMetadataValue(metadata.isbn),
 		dateAdded: sanitizeMetadataValue(metadata.dateAdded),

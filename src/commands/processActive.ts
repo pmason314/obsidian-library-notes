@@ -1,7 +1,7 @@
 import { App, Notice, TFile } from "obsidian";
 import { createOrUpdateCompanionNote } from "noteWriter";
 import { MediaNoteSettings, NoteWriteResult, ZoteroCache } from "types";
-import { isInWatchedFolders, isSupportedMediaFile } from "utils/paths";
+import { isSupportedMediaFile } from "utils/paths";
 
 export async function processActiveFile(
 	app: App,
@@ -16,12 +16,7 @@ export async function processActiveFile(
 	}
 
 	if (!isSupportedMediaFile(activeFile)) {
-		new Notice("Active file is not a supported library file (PDF or EPUB).");
-		return;
-	}
-
-	if (!isInWatchedFolders(activeFile.path, settings.watchedFolders)) {
-		new Notice("Active file is outside watched folders.");
+		new Notice("Active file is not a supported library file type (e.g. PDF or EPUB).");
 		return;
 	}
 

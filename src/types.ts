@@ -6,7 +6,7 @@ export interface MediaNoteSettings {
 	outputFolderName: string;
 	autoCreateOnAdd: boolean;
 	zoteroUserId: string;
-	zoteroApiKeyName: string; // name of the SecretStorage entry holding the API key
+	zoteroApiKeyName: string; // SecretStorage entry for API key
 }
 
 export interface BookMetadata {
@@ -14,6 +14,7 @@ export interface BookMetadata {
 	author: string | null;
 	year: string | null;
 	publisher: string | null;
+	edition: string | null;
 	language: string | null;
 	isbn: string | null;
 	dateAdded: string | null;

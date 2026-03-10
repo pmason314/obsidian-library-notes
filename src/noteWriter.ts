@@ -3,10 +3,9 @@ import { extractMetadataFromFile } from "metadataExtractor";
 import { MediaNoteSettings, NoteWriteResult, BookMetadata, ZoteroCache } from "types";
 import { normalizeVaultPath } from "utils/paths";
 
-// Keys written by Zotero extraction — these are always refreshed on re-generation.
 // Any frontmatter key NOT in this set is treated as user-managed and is preserved.
 const ZOTERO_FRONTMATTER_KEYS = new Set([
-	"title", "author", "year", "publisher", "language", "isbn", "date_added", "tags", "file",
+	"title", "author", "year", "publisher", "edition", "language", "isbn", "date_added", "tags", "file",
 ]);
 
 function sanitizeFilename(value: string): string {
@@ -24,6 +23,7 @@ export function generateFrontmatter(metadata: BookMetadata): string {
 	if (metadata.author) lines.push(`author: ${quoteYaml(metadata.author)}`);
 	if (metadata.year) lines.push(`year: ${quoteYaml(metadata.year)}`);
 	if (metadata.publisher) lines.push(`publisher: ${quoteYaml(metadata.publisher)}`);
+	if (metadata.edition) lines.push(`edition: ${quoteYaml(metadata.edition)}`);
 	if (metadata.language) lines.push(`language: ${quoteYaml(metadata.language)}`);
 	if (metadata.isbn) lines.push(`isbn: ${quoteYaml(metadata.isbn)}`);
 	if (metadata.dateAdded) lines.push(`date_added: ${quoteYaml(metadata.dateAdded)}`);
@@ -41,20 +41,17 @@ export function generateFrontmatter(metadata: BookMetadata): string {
  * Merges fresh Zotero frontmatter into an existing note.
  * - Zotero-managed keys (ZOTERO_FRONTMATTER_KEYS) are replaced with values from newFrontmatter.
  * - User-added frontmatter keys are preserved in place.
- * - The note body (everything after the closing ---) is always preserved.
- * - If the existing content has no frontmatter block, the new frontmatter is prepended.
  */
 export function mergeNoteContent(existingContent: string, newFrontmatter: string): string {
 	const fmMatch = existingContent.match(/^---\n([\s\S]*?\n)---(\n|$)/);
 	if (!fmMatch) {
-		// No existing frontmatter — prepend and keep all existing content as body
 		return newFrontmatter + existingContent;
 	}
 
 	const body = existingContent.slice(fmMatch[0].length);
 	const existingFmLines = (fmMatch[1] ?? "").split("\n");
 
-	// Collect user-defined lines (keys not managed by Zotero)
+	// Collect user-defined properties
 	const userLines: string[] = [];
 	for (const line of existingFmLines) {
 		const keyMatch = line.match(/^([a-zA-Z0-9_-]+)\s*:/);
@@ -67,7 +64,6 @@ export function mergeNoteContent(existingContent: string, newFrontmatter: string
 		return newFrontmatter + body;
 	}
 
-	// Inject user lines before the closing --- of the new frontmatter
 	const closingIndex = newFrontmatter.lastIndexOf("\n---\n");
 	const beforeClose = newFrontmatter.slice(0, closingIndex);
 	const afterClose = newFrontmatter.slice(closingIndex); // "\n---\n"
@@ -118,8 +114,7 @@ function splitNotePath(notePath: string): { folder: string; stem: string; extens
 }
 
 /**
- * Returns a free path for a new note, incrementing a numeric suffix to avoid
- * collisions with notes that belong to different source files.
+ * Returns a free path for a new note.  Adds a numeric suffix if needed.
  */
 async function findFreeNotePath(app: App, preferredPath: string): Promise<string> {
 	if (!app.vault.getAbstractFileByPath(preferredPath)) {
@@ -164,7 +159,6 @@ export async function createOrUpdateCompanionNote(
 		}
 	}
 
-	// Preferred path is free or belongs to a different source — find a free path and create.
 	const writePath = existingFile ? await findFreeNotePath(app, preferredNotePath) : preferredNotePath;
 	await app.vault.create(writePath, newFrontmatter);
 	return { notePath: writePath, updated: false, warnings: extraction.warnings };

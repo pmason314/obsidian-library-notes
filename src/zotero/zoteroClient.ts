@@ -11,8 +11,7 @@ function sleep(ms: number): Promise<void> {
 }
 
 /**
- * Make a plain Node.js HTTP request to localhost, bypassing Electron's CORS restrictions.
- * Only use this for loopback addresses — not for general network requests.
+ * HTTP request to localhost for loopback addresses.
  */
 function nodeHttpGet(path: string, timeoutMs: number): Promise<string> {
 	return new Promise((resolve, reject) => {
@@ -48,9 +47,8 @@ export class ZoteroClient {
 	}
 
 	/**
-	 * Search Zotero for items matching the given title.
-	 * Tries the local Zotero desktop app first (no rate limits),
-	 * then falls back to the web API with exponential backoff.
+	 * Search Zotero for items with matching titles.
+	 * Tries local Zotero desktop app first with fallback to web API.
 	 * Automatically resolves attachment items to their parent library entries.
 	 */
 	async searchByTitle(title: string): Promise<ZoteroItem[]> {
@@ -97,7 +95,6 @@ export class ZoteroClient {
 					console.warn(`[Zotero] Could not fetch parent ${parentKey}: ${err instanceof Error ? err.message : String(err)}`);
 				}
 			} else if (!parentKey && !resolvedKeys.has(att.key)) {
-				// Standalone attachment with no parent — keep as fallback
 				resolved.push(att);
 				resolvedKeys.add(att.key);
 			}

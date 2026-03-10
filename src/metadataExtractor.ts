@@ -9,9 +9,9 @@ function sanitizeZoteroTag(tag: string): string | null {
 	const sanitized = tag
 		.trim()
 		.toLowerCase()
-		.replace(/[\s_]+/g, "-")        // spaces/underscores → hyphens
-		.replace(/[^a-z-]/g, "");       // strip everything except letters and hyphens
-	if (!sanitized || /^-|-$/.test(sanitized)) return null; // drop empty or leading/trailing hyphens
+		.replace(/[\s_]+/g, "-")
+		.replace(/[^a-z-]/g, "");
+	if (!sanitized || /^-|-$/.test(sanitized)) return null;
 	return sanitized;
 }
 
@@ -33,6 +33,7 @@ function mapZoteroItem(item: ZoteroItem): Partial<BookMetadata> {
 		author,
 		year: data.date ?? null,
 		publisher: data.publisher ?? null,
+		edition: data.edition ?? null,
 		language: data.language ?? null,
 		isbn: data.ISBN ?? null,
 		dateAdded: data.dateAdded ? data.dateAdded.slice(0, 10) : null,
@@ -52,13 +53,13 @@ export async function extractMetadataFromFile(
 ): Promise<ExtractionResult> {
 	const warnings: string[] = [];
 
-	// Cache hit — skip network lookup
+	// Cache hit
 	const cached = zoteroCache[file.path];
 	if (cached) {
 		return { metadata: withFallbackMetadata(cached.metadata, file.path), warnings };
 	}
 
-	// Zotero not configured — fall back to filename
+	// Fall back to filename if Zotero is not configured
 	if (!settings.zoteroUserId) {
 		return { metadata: withFallbackMetadata({}, file.path), warnings };
 	}

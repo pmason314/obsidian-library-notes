@@ -1,6 +1,6 @@
 import { TFile } from "obsidian";
 
-const MEDIA_EXTENSIONS = new Set(["pdf", "epub"]);
+const MEDIA_EXTENSIONS = new Set(["pdf", "epub", "mobi", "azw3", "doc", "docx"]);
 
 export function normalizeVaultPath(path: string): string {
 	return path.replace(/\\/g, "/").replace(/^\/+|\/+$/g, "").trim();

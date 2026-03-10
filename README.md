@@ -12,7 +12,7 @@ An Obsidian plugin that automatically creates companion Markdown notes for libra
 
 ## Requirements
 
-- Obsidian 1.8.7 or later (desktop only)
+- Obsidian 1.11.4 or later (desktop only)
 - [Zotero](https://www.zotero.org/) desktop app, or a Zotero web API key
 
 ## Installation
@@ -28,7 +28,7 @@ An Obsidian plugin that automatically creates companion Markdown notes for libra
 Copy `main.js`, `manifest.json`, and `styles.css` to:
 
 ```
-<Vault>/.obsidian/plugins/reading-note-generator/
+<Vault>/.obsidian/plugins/library-note-generator/
 ```
 
 Then enable the plugin in **Settings → Community plugins**.
@@ -49,7 +49,7 @@ Enter your numeric Zotero **User ID** (found at [zotero.org/settings/keys](https
 
 **Option B — Zotero web API**
 
-Enter your **User ID** and a read-only **API key** (created at [zotero.org/settings/keys](https://www.zotero.org/settings/keys)) in the settings. The API key is stored in vault-scoped localStorage and is never written to `data.json` or synced.
+Enter your **User ID** and a read-only **API key** (created at [zotero.org/settings/keys](https://www.zotero.org/settings/keys)) in the settings. The API key is stored securely using Obsidian's SecretStorage.
 
 ### 3. Choose a companion note location
 

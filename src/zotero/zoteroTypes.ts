@@ -1,8 +1,8 @@
 export interface ZoteroCreator {
-	creatorType: string; // "author", "editor", "translator", etc.
+	creatorType: string; // author/editor/etc.
 	firstName?: string;
 	lastName?: string;
-	name?: string; // single-field name (organizations, etc.)
+	name?: string; // single-field name for organizations, etc.
 }
 
 export interface ZoteroTag {
@@ -18,11 +18,12 @@ export interface ZoteroItemData {
 	creators?: ZoteroCreator[];
 	date?: string;
 	publisher?: string;
+	edition?: string;
 	language?: string;
 	ISBN?: string;
 	dateAdded?: string;
 	tags?: ZoteroTag[];
-	parentItem?: string; // key of parent, present on attachments/notes
+	parentItem?: string; // Used for attachments/notes
 }
 
 export interface ZoteroItem {
