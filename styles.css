@@ -6,3 +6,19 @@ available in the app when your plugin is enabled.
 If your plugin does not need CSS, delete this file.
 
 */
+
+.media-notes-input-full-width {
+    width: 100%;
+}
+
+.media-notes-section-heading {
+    margin-top: 2em;
+}
+
+.media-notes-watched-folders-heading .setting-item-description {
+    margin-top: 0.4em;
+}
+
+.media-notes-watched-folders-heading .setting-item-control {
+    padding: 0.4em 2em;
+}

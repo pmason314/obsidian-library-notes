@@ -8,6 +8,7 @@ export default tseslint.config(
 		languageOptions: {
 			globals: {
 				...globals.browser,
+				createFragment: "readonly",
 			},
 			parserOptions: {
 				projectService: {
@@ -22,6 +23,15 @@ export default tseslint.config(
 		},
 	},
 	...obsidianmd.configs.recommended,
+	{
+		plugins: { obsidianmd },
+		rules: {
+			"obsidianmd/ui/sentence-case": ["error", {
+				acronyms: ["PDF", "EPUB", "API", "ID"],
+				ignoreWords: ["PDFs", "EPUBs", "Generate"],
+			}],
+		},
+	},
 	globalIgnores([
 		"node_modules",
 		"dist",

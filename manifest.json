@@ -3,7 +3,7 @@
     "name": "Library Note Generator",
     "version": "0.1.0",
     "minAppVersion": "1.11.4",
-    "description": "Auto-creates companion markdown notes for books, PDFs, and EPUBs stored in your vault, populated with metadata from Zotero.",
+    "description": "Auto-creates companion markdown notes for books, PDFs, and EPUBs stored in your vault, optionally populated with metadata from Zotero.",
     "author": "Peter Mason",
     "authorUrl": "https://github.com/pmason314",
     "isDesktopOnly": true
