@@ -119,7 +119,7 @@ function splitNotePath(notePath: string): { folder: string; stem: string; extens
 /**
  * Returns a free path for a new note.  Adds a numeric suffix if needed.
  */
-async function findFreeNotePath(app: App, preferredPath: string): Promise<string> {
+function findFreeNotePath(app: App, preferredPath: string): string {
 	if (!app.vault.getAbstractFileByPath(preferredPath)) {
 		return preferredPath;
 	}
@@ -162,7 +162,7 @@ export async function createOrUpdateCompanionNote(
 		}
 	}
 
-	const writePath = existingFile ? await findFreeNotePath(app, preferredNotePath) : preferredNotePath;
+	const writePath = existingFile ? findFreeNotePath(app, preferredNotePath) : preferredNotePath;
 	await app.vault.create(writePath, newFrontmatter);
 	return { notePath: writePath, updated: false, warnings: extraction.warnings };
 }
