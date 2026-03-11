@@ -1,6 +1,6 @@
 {
     "name": "obsidian-library-notes",
-    "version": "0.1.0",
+    "version": "1.0.0",
     "description": "Obsidian plugin that creates companion notes for PDF and EPUB files.",
     "main": "main.js",
     "type": "module",
