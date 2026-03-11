@@ -2,6 +2,7 @@ import { App, TFile } from "obsidian";
 import { extractMetadataFromFile } from "metadataExtractor";
 import { MediaNoteSettings, NoteWriteResult, BookMetadata, ZoteroCache } from "types";
 import { normalizeVaultPath } from "utils/paths";
+import { filenameToTitle } from "utils/fallbacks";
 
 // Any frontmatter key NOT in this set is treated as user-managed and is preserved.
 const ZOTERO_FRONTMATTER_KEYS = new Set([
@@ -71,8 +72,10 @@ export function mergeNoteContent(existingContent: string, newFrontmatter: string
 }
 
 export function generateNotePath(metadata: BookMetadata, settings: MediaNoteSettings): string {
-	const title = metadata.title ?? "Untitled";
-	const noteName = `${sanitizeFilename(title)}.md`;
+	const stem = metadata.sourceFile
+		? sanitizeFilename(filenameToTitle(metadata.sourceFile))
+		: sanitizeFilename(metadata.title ?? "Untitled");
+	const noteName = `${stem}.md`;
 	const folderName = normalizeVaultPath(settings.outputFolderName) || "Notes";
 
 	if (settings.outputMode === "subfolder") {

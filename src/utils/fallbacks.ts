@@ -34,11 +34,13 @@ export function filenameToTitle(filePath: string): string {
 export function filenameToSearchQuery(filePath: string): string {
 	const base = filenameToTitle(filePath);
 	return base
-		.replace(/\(\d{4}\)/g, "")               // (2018)
-		.replace(/\[\d{4}\]/g, "")               // [2018]
+		.replace(/\(\s*\d{4}\s*\)/g, "")         // (2018) or ( 2018 )
+		.replace(/\[\s*\d{4}\s*\]/g, "")         // [2018] or [ 2018 ]
 		.replace(/\b\d{4}\b/g, "")               // bare 4-digit year
 		.replace(/\b\d+(st|nd|rd|th)\s+ed(ition)?\b/gi, "")  // 2nd edition
 		.replace(/\bedition\b/gi, "")
+		.replace(/\(\s*\)/g, "")
+		.replace(/\[\s*\]/g, "")
 		.replace(/\s+/g, " ")
 		.trim();
 }

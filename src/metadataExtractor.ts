@@ -84,9 +84,21 @@ export async function extractMetadataFromFile(
 		return { metadata: withFallbackMetadata({}, file.path), warnings };
 	}
 
+	const normalize = (s: string) =>
+		s.toLowerCase().replace(/[^a-z0-9\s]/g, "").replace(/\s+/g, " ").trim();
+
+	const normalizedQuery = normalize(searchTitle);
+
+	// Prefer an exact title match when multiple results are returned,
+	const exactMatch = items.find(
+		(item) => normalize(item.data.title ?? "") === normalizedQuery
+	);
+
 	let chosen: ZoteroItem;
 	if (items.length === 1) {
 		chosen = items[0]!;
+	} else if (exactMatch) {
+		chosen = exactMatch;
 	} else if (isBatch) {
 		chosen = items[0]!;
 	} else {
