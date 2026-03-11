@@ -1,4 +1,6 @@
 import * as http from "http";
+import { Buffer } from "buffer";
+import { requestUrl, RequestUrlResponse } from "obsidian";
 import { ZoteroItem } from "zotero/zoteroTypes";
 
 const WEB_API_BASE = "https://api.zotero.org";
@@ -120,16 +122,16 @@ export class ZoteroClient {
 		const headers = { Authorization: `Bearer ${this.apiKey}`, "Zotero-API-Version": "3" };
 
 		for (let attempt = 0; attempt < MAX_WEB_RETRIES; attempt++) {
-			let response: Response;
+			let response: RequestUrlResponse;
 			try {
-				response = await fetch(url, { headers });
+				response = await requestUrl({ url, headers, throw: false });
 			} catch (err) {
 				throw new Error(`Zotero network error: ${err instanceof Error ? err.message : String(err)}`);
 			}
 
 			if (response.status === 429) {
 				if (attempt < MAX_WEB_RETRIES - 1) {
-					const retryAfter = parseInt(response.headers.get("Retry-After") ?? "0", 10);
+					const retryAfter = parseInt(response.headers["retry-after"] ?? "0", 10);
 					const delay = retryAfter > 0 ? retryAfter * 1000 : 1000 * Math.pow(2, attempt + 1);
 					await sleep(delay);
 					continue;
@@ -139,21 +141,21 @@ export class ZoteroClient {
 
 			if (response.status === 401) throw new Error("Zotero authentication failed. Check your API key in settings.");
 			if (response.status === 403) throw new Error("Zotero access denied. Ensure your API key has read permissions.");
-			if (!response.ok) throw new Error(`Zotero API error: HTTP ${response.status}`);
+			if (response.status < 200 || response.status >= 300) throw new Error(`Zotero API error: HTTP ${response.status}`);
 
-			const items = await response.json() as ZoteroItem[];
-			return items;
+			return response.json as ZoteroItem[];
 		}
 
 		throw new Error("Zotero web search failed after retries.");
 	}
 
 	private async fetchItemWeb(key: string): Promise<ZoteroItem> {
-		const url = `${WEB_API_BASE}/users/${encodeURIComponent(this.userId)}/items/${key}`;
-		const response = await fetch(url, {
+		const response = await requestUrl({
+			url: `${WEB_API_BASE}/users/${encodeURIComponent(this.userId)}/items/${key}`,
 			headers: { Authorization: `Bearer ${this.apiKey}`, "Zotero-API-Version": "3" },
+			throw: false,
 		});
-		if (!response.ok) throw new Error(`Zotero item fetch error: HTTP ${response.status}`);
-		return response.json() as Promise<ZoteroItem>;
+		if (response.status < 200 || response.status >= 300) throw new Error(`Zotero item fetch error: HTTP ${response.status}`);
+		return response.json as ZoteroItem;
 	}
 }

@@ -13,9 +13,9 @@ export const DEFAULT_SETTINGS: MediaNoteSettings = {
 };
 
 class FolderSuggest extends AbstractInputSuggest<string> {
-	private onSelectCallback: (value: string) => void;
+	private onSelectCallback: (value: string) => void | Promise<void>;
 
-	constructor(app: App, inputEl: HTMLInputElement, onSelect: (value: string) => void) {
+	constructor(app: App, inputEl: HTMLInputElement, onSelect: (value: string) => void | Promise<void>) {
 		super(app, inputEl);
 		this.onSelectCallback = onSelect;
 	}
@@ -45,7 +45,7 @@ class FolderSuggest extends AbstractInputSuggest<string> {
 
 	selectSuggestion(value: string, _evt: MouseEvent | KeyboardEvent): void {
 		this.setValue(value);
-		this.onSelectCallback(value);
+		void this.onSelectCallback(value);
 		this.close();
 	}
 }
@@ -70,21 +70,22 @@ export class MediaNoteSettingTab extends PluginSettingTab {
 		new Setting(section)
 			.setName("Watched folders")
 			.setHeading()
-			.setDesc("Only library files (PDFs, EPUBs, and other non-Markdown) in these folders will have companion notes created. Use the 'Generate notes for all library files' command to create or update companion notes.")
+			.setDesc("Only library files (PDFs, EPUBs and other non-Markdown) in these folders will have companion notes created. Use the 'Generate notes for all library files' command to create or update companion notes.")
 			.addButton((button) => button
 				.setButtonText("Add folder")
 				.onClick(async () => {
 					this.plugin.settings.watchedFolders.push("");
 					await this.plugin.saveSettings();
 					this.display();
-				}));
+				}))
+			.settingEl.addClass("media-notes-watched-folders-heading");
 
 		this.plugin.settings.watchedFolders.forEach((folder, index) => {
 			new Setting(section)
 				.setName(`Watch Folder #${index + 1}`)
 				.addText((text) => {
 					text.setPlaceholder("Folder path").setValue(folder);
-					text.inputEl.style.width = "100%";
+					text.inputEl.addClass("media-notes-input-full-width");
 
 					new FolderSuggest(this.app, text.inputEl, async (selected) => {
 						this.plugin.settings.watchedFolders[index] = normalizeVaultPath(selected);
@@ -111,16 +112,24 @@ export class MediaNoteSettingTab extends PluginSettingTab {
 		const { containerEl } = this;
 		containerEl.empty();
 
-		const title = containerEl.createEl("h2", { text: "Library Note Generator settings" });
-		title.style.marginBottom = "1.5em";
-
 		this.renderWatchedFolders(containerEl);
 
 		// Output folder
 		const notesHeading = new Setting(containerEl)
-			.setName("Companion Note Settings")
+			.setName("Companion notes")
 			.setHeading();
-		notesHeading.settingEl.style.marginTop = "2em";
+		notesHeading.settingEl.addClass("media-notes-section-heading");
+
+		new Setting(containerEl)
+			.setName("Auto-create on add")
+			.setDesc("Automatically create a companion note when a new library file (PDF, EPUB, etc.) is added to a watched folder")
+			.addToggle((toggle) => toggle
+				.setValue(this.plugin.settings.autoCreateOnAdd)
+				.onChange(async (value) => {
+					await this.updateSettings((settings) => {
+						settings.autoCreateOnAdd = value;
+					});
+				}));
 
 		new Setting(containerEl)
 			.setName("Companion note mode")
@@ -144,7 +153,7 @@ export class MediaNoteSettingTab extends PluginSettingTab {
 				: "Path where all auto-created companion notes are saved")
 			.addText((text) => {
 				text.setPlaceholder("Notes").setValue(this.plugin.settings.outputFolderName);
-				text.inputEl.style.width = "100%";
+				text.inputEl.addClass("media-notes-input-full-width");
 
 				if (!isSubfolder) {
 					new FolderSuggest(this.app, text.inputEl, async (selected) => {
@@ -163,7 +172,7 @@ export class MediaNoteSettingTab extends PluginSettingTab {
 		const zoteroHeading = new Setting(containerEl)
 			.setName("Zotero")
 			.setHeading();
-		zoteroHeading.settingEl.style.marginTop = "2em";
+		zoteroHeading.settingEl.addClass("media-notes-section-heading");
 
 		new Setting(containerEl)
 			.setName("User ID")
@@ -203,23 +212,6 @@ export class MediaNoteSettingTab extends PluginSettingTab {
 					this.plugin.zoteroCache = {};
 					await this.plugin.saveSettings();
 					new Notice("Zotero cache cleared.");
-				}));
-
-		// General
-		const generalHeading = new Setting(containerEl)
-			.setName("General")
-			.setHeading();
-		generalHeading.settingEl.style.marginTop = "2em";
-
-		new Setting(containerEl)
-			.setName("Auto-create on add")
-			.setDesc("Automatically create a companion note when a new library file (PDF, EPUB, etc.) is added to a watched folder")
-			.addToggle((toggle) => toggle
-				.setValue(this.plugin.settings.autoCreateOnAdd)
-				.onChange(async (value) => {
-					await this.updateSettings((settings) => {
-						settings.autoCreateOnAdd = value;
-					});
 				}));
 
 	}
